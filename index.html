@@ -307,6 +307,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let WORDS = [];
+let ACCEPTED_WORDS = new Set();
 let WORD_LENGTH = 0;
 const MAX_ATTEMPTS = 6;
 const START_DATE = "2026-09-20";
@@ -374,6 +375,22 @@ async function loadWords() {
   }
 }
 
+async function loadAcceptedWords() {
+  const response = await fetch("mots_acceptes.json"); // Dictionnaire des mots valides pour les essais
+  if (!response.ok) throw new Error("Impossible de charger le fichier mots_acceptes.json");
+  const rawWords = await response.json();
+
+  ACCEPTED_WORDS = new Set(
+    rawWords
+      .map(w => String(w).trim().toUpperCase())
+      .filter(w => /^[A-Z]+$/.test(w))
+  );
+
+  if (!ACCEPTED_WORDS.size) {
+    throw new Error("Aucun mot valide dans mots_acceptes.json");
+  }
+}
+
 window.setPseudo = function () {
   const input = document.getElementById("pseudo");
   const pseudo = input.value.trim();
@@ -398,6 +415,7 @@ window.changePseudo = function () {
 async function initGame() {
   try {
     if (!WORDS.length) await loadWords();
+    if (!ACCEPTED_WORDS.size) await loadAcceptedWords();
   } catch (error) {
     document.getElementById("game-error").textContent = `Erreur de chargement des mots : ${error.message}`;
     document.getElementById("game-error").style.display = "block";
@@ -407,6 +425,10 @@ async function initGame() {
   todayWord = getTodayWord();
   WORD_LENGTH = todayWord.length;
   todayStr = getLocalDateStr();
+
+  // S'assure que le mot du jour est toujours accepté comme essai valide,
+  // même s'il n'est pas (encore) présent dans mots_acceptes.json
+  ACCEPTED_WORDS.add(todayWord);
 
   // Mise à jour de la variable CSS --word-length
   document.documentElement.style.setProperty('--word-length', WORD_LENGTH);
@@ -527,6 +549,11 @@ function handleKey(key) {
   if (key === "ENTREE") {
     if (currentGuess.length !== WORD_LENGTH) {
       errorEl.textContent = `Complète le mot (${WORD_LENGTH} lettres) avant de valider.`;
+      errorEl.style.display = "block";
+      return;
+    }
+    if (!ACCEPTED_WORDS.has(currentGuess)) {
+      errorEl.textContent = `"${currentGuess}" n'est pas un mot reconnu.`;
       errorEl.style.display = "block";
       return;
     }
