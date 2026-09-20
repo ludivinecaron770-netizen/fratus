@@ -228,7 +228,24 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 // ⚠️ Remplacez par votre configuration Firebase (nouveau projet dédié à ce jeu)
-const firebaseConfig = VOTRE_CONFIG_FIREBASE_ICI;
+const firebaseConfig = {
+
+  apiKey: "AIzaSyB97-zv40yAUPU18J792sv3pWNlhoRbkec",
+
+  authDomain: "fratus-8c11e.firebaseapp.com",
+
+  projectId: "fratus-8c11e",
+
+  storageBucket: "fratus-8c11e.firebasestorage.app",
+
+  messagingSenderId: "724334283668",
+
+  appId: "1:724334283668:web:54a4f4123de5ed8a721d81",
+
+  measurementId: "G-WDCBQBE7PZ"
+
+};
+
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
