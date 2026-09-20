@@ -315,7 +315,7 @@ const START_DATE = "2026-09-20";
 const AZERTY_ROWS = [
   ["A","Z","E","R","T","Y","U","I","O","P"],
   ["Q","S","D","F","G","H","J","K","L","M"],
-  ["ENTREE","W","X","C","V","B","N","EFFACER"]
+  ["ENTREE","W","X","C","V","B","N",".","EFFACER"]
 ];
 
 let currentPseudo = "";
@@ -437,14 +437,28 @@ async function initGame() {
 
   const resultDoc = await getDoc(doc(db, "motusResults", `${todayStr}_${pseudoDocId(currentPseudo)}`));
 
-  if (resultDoc.exists()) {
+  if (resultDoc.exists() && resultDoc.data().finished) {
+    // Partie déjà terminée aujourd'hui (gagnée ou perdue) : on affiche juste le résultat.
     const d = resultDoc.data();
     guesses = d.guesses || [];
     feedbacks = guesses.map(g => computeFeedback(g));
     gameOver = true;
+    keyStatus = computeKeyStatus(guesses, feedbacks);
     renderGrid();
     renderKeyboard();
     showResultBanner(d.solved, d.attempts);
+  } else if (resultDoc.exists()) {
+    // Partie commencée mais pas terminée (ex: page rechargée en cours de route) :
+    // on reprend exactement où le joueur en était, sans lui redonner 6 essais neufs.
+    const d = resultDoc.data();
+    guesses = d.guesses || [];
+    feedbacks = guesses.map(g => computeFeedback(g));
+    gameOver = false;
+    keyStatus = computeKeyStatus(guesses, feedbacks);
+    currentGuess = todayWord[0];
+    renderGrid();
+    renderKeyboard();
+    document.getElementById("result-banner").style.display = "none";
   } else {
     guesses = [];
     feedbacks = [];
@@ -455,6 +469,21 @@ async function initGame() {
     renderKeyboard();
     document.getElementById("result-banner").style.display = "none";
   }
+}
+
+function computeKeyStatus(guessList, feedbackList) {
+  const status = {};
+  const rank = { green: 3, yellow: 2, grey: 1 };
+  guessList.forEach((guess, gi) => {
+    const fb = feedbackList[gi];
+    guess.split("").forEach((letter, i) => {
+      const s = fb[i];
+      if (!status[letter] || rank[s] > rank[status[letter]]) {
+        status[letter] = s;
+      }
+    });
+  });
+  return status;
 }
 
 function computeFeedback(guess) {
@@ -599,10 +628,29 @@ async function submitGuess() {
     await finishGame(solved, guesses.length);
   } else {
     currentGuess = todayWord[0];
+    await saveProgress();
   }
 
   renderGrid();
   renderKeyboard();
+}
+
+async function saveProgress() {
+  try {
+    await setDoc(doc(db, "motusResults", `${todayStr}_${pseudoDocId(currentPseudo)}`), {
+      pseudo: currentPseudo,
+      date: todayStr,
+      attempts: guesses.length,
+      solved: false,
+      finished: false,
+      points: 0,
+      guesses,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    document.getElementById("game-error").textContent = `Erreur d'enregistrement : ${error.message}`;
+    document.getElementById("game-error").style.display = "block";
+  }
 }
 
 async function finishGame(solved, attempts) {
@@ -615,6 +663,7 @@ async function finishGame(solved, attempts) {
       date: todayStr,
       attempts,
       solved,
+      finished: true,
       points,
       guesses,
       updatedAt: serverTimestamp()
@@ -697,7 +746,9 @@ function startTodayResults() {
     if (snapshot.empty) { emptyNote.style.display = "block"; return; }
     emptyNote.style.display = "none";
 
-    const rows = snapshot.docs.map(d => d.data()).sort((a, b) => b.points - a.points);
+    const rows = snapshot.docs.map(d => d.data()).filter(d => d.finished).sort((a, b) => b.points - a.points);
+
+    if (!rows.length) { emptyNote.style.display = "block"; return; }
 
     rows.forEach((d) => {
       const isYou = d.pseudo === currentPseudo;
