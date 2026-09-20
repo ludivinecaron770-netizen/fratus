@@ -95,7 +95,7 @@
     gap: 6px;
     margin-bottom: 18px;
   }
-  .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .row { display: grid; grid-template-columns: repeat(var(--word-length), 1fr); gap: 6px; }
   .tile {
     aspect-ratio: 1;
     display: flex;
@@ -246,28 +246,14 @@ const firebaseConfig = {
 
 };
 
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // Liste de mots de 5 lettres (sans accents). Le mot du jour est choisi
 // automatiquement selon la date, le même pour tout le monde.
-const WORDS = [
-"TABLE","CHIEN","TIGRE","POMME","CARTE","LIVRE","STYLO","CRAIE","GOMME","REGLE",
-"ECOLE","MAIRE","VILLE","ROUTE","PLACE","FORET","NUAGE","PLUIE","VENTE","ORAGE",
-"GIVRE","GLACE","FUMEE","FERME","CHAMP","ROCHE","SABLE","GALET","CORDE","NOEUD",
-"BETON","ACIER","LAINE","COTON","TISSU","NAPPE","TAPIS","ETAGE","SALON","METRO",
-"TRAIN","AVION","PISTE","PANNE","FREIN","SIEGE","CAPOT","PHARE","VITRE","CADRE",
-"TOILE","MUSEE","DANSE","ECRAN","PHOTO","IMAGE","VIDEO","BRUIT","CHANT","GAMME",
-"PIANO","FLUTE","FRERE","SOEUR","ONCLE","TANTE","NEVEU","NIECE","MAMIE","AMOUR",
-"BISOU","ANNEE","MATIN","HEURE","HIVER","FROID","CHAUD","TIEDE","TERRE","FUSEE",
-"PLAGE","VOILE","FLEUR","NEIGE","PORTE","SOURD","VERRE","TASSE","GRAND","PETIT",
-"BELLE","VERTE","ROUGE","JAUNE","BLEUE","BLANC","LOURD","LEGER","LARGE","HAUTE",
-"COURT","RONDE","CARRE","DOUCE","AMERE","SUCRE","SALEE","EPICE","PATES","TARTE",
-"SOUPE","FRUIT","MELON","PRUNE","OLIVE","HERBE","TRONC"
-];
+let WORDS = [];
 
-const WORD_LENGTH = 5;
+let WORD_LENGTH = 0;
 const MAX_ATTEMPTS = 6;
 const START_DATE = "2026-09-20"; // jour 0 du défi
 
@@ -320,6 +306,20 @@ function getTodayWord() {
   return WORDS[wrapped];
 }
 
+async function loadWords() {
+  const response = await fetch("mots.json");
+  if (!response.ok) throw new Error("Impossible de charger le fichier mots.json");
+  const rawWords = await response.json();
+
+  WORDS = rawWords
+    .map(w => String(w).trim().toUpperCase())
+    .filter(w => /^[A-Z]+$/.test(w) && w.length >= 4 && w.length <= 8);
+
+  if (!WORDS.length) {
+    throw new Error("Aucun mot valide dans mots.json");
+  }
+}
+
 window.setPseudo = function () {
   const input = document.getElementById("pseudo");
   const pseudo = input.value.trim();
@@ -342,7 +342,16 @@ window.changePseudo = function () {
 };
 
 async function initGame() {
+  try {
+    if (!WORDS.length) await loadWords();
+  } catch (error) {
+    document.getElementById("game-error").textContent = `Erreur de chargement des mots : ${error.message}`;
+    document.getElementById("game-error").style.display = "block";
+    return;
+  }
+
   todayWord = getTodayWord();
+  WORD_LENGTH = todayWord.length;
   todayStr = getLocalDateStr();
   document.getElementById("day-label").textContent = `Mot du jour — ${new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long" })}`;
 
@@ -457,7 +466,7 @@ function handleKey(key) {
   }
   if (key === "ENTREE") {
     if (currentGuess.length !== WORD_LENGTH) {
-      errorEl.textContent = "Complète le mot (5 lettres) avant de valider.";
+      errorEl.textContent = "Complète le mot (${WORD_LENGTH} lettres) avant de valider.";
       errorEl.style.display = "block";
       return;
     }
