@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔤 Motus d'Équipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-dark: #14171c;
+    --bg: #1c2129;
+    --chalk: #f2f3f5;
+    --chalk-dim: #9aa3af;
+    --accent: #f0a202;
+    --accent-dark: #c97e00;
+    --green: #4caf50;
+    --yellow: #d4a017;
+    --grey: #3a4049;
+    --error: #ff6b6b;
+    --card-bg: rgba(255,255,255,0.05);
+    --card-border: rgba(255,255,255,0.12);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg-dark) 100%);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--chalk);
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px 60px;
+  }
+  .wrap { width: 100%; max-width: 440px; }
+  h1 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.5rem, 6vw, 1.9rem);
+    text-align: center;
+    margin: 8px 0 24px;
+    letter-spacing: 0.02em;
+  }
+  .section { display: none; }
+  .section.active { display: block; }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  p.lead { color: var(--chalk-dim); margin-top: 0; line-height: 1.5; }
+  label { display: block; font-size: 0.85rem; color: var(--chalk-dim); margin: 14px 0 6px; }
+  input[type="text"] {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: rgba(0,0,0,0.25);
+    color: var(--chalk);
+    font-size: 1rem;
+    font-family: inherit;
+  }
+  input::placeholder { color: rgba(242,243,245,0.35); }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    width: 100%;
+    margin-top: 14px;
+    padding: 13px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #1a1200;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .error-msg { color: var(--error); font-size: 0.88rem; margin-top: 10px; display: none; }
+  .footer-link {
+    display: block; text-align: center; color: var(--chalk-dim);
+    font-size: 0.85rem; margin-top: 6px; text-decoration: underline; cursor: pointer;
+  }
+
+  /* Grille Motus */
+  .day-label { text-align: center; color: var(--chalk-dim); font-size: 0.85rem; margin-bottom: 14px; }
+  .grid {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .tile {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: clamp(1.1rem, 5vw, 1.5rem);
+    border: 2px solid var(--card-border);
+    border-radius: 6px;
+    background: rgba(0,0,0,0.2);
+    text-transform: uppercase;
+  }
+  .tile.filled { border-color: var(--chalk-dim); }
+  .tile.given { background: rgba(240,162,2,0.15); border-color: var(--accent); }
+  .tile.green { background: var(--green); border-color: var(--green); color: #0a1f0c; }
+  .tile.yellow { background: var(--yellow); border-color: var(--yellow); color: #241c00; }
+  .tile.grey { background: var(--grey); border-color: var(--grey); color: var(--chalk-dim); }
+
+  /* Clavier virtuel */
+  .keyboard { display: flex; flex-direction: column; gap: 6px; }
+  .kb-row { display: flex; justify-content: center; gap: 4px; }
+  .key {
+    flex: 1;
+    max-width: 34px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.08);
+    border: none;
+    border-radius: 6px;
+    color: var(--chalk);
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .key.wide { max-width: 60px; font-size: 0.7rem; }
+  .key.green { background: var(--green); color: #0a1f0c; }
+  .key.yellow { background: var(--yellow); color: #241c00; }
+  .key.grey { background: var(--grey); color: var(--chalk-dim); }
+
+  .result-banner {
+    text-align: center;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+  }
+  .result-banner.win { background: rgba(76,175,80,0.15); color: var(--green); }
+  .result-banner.lose { background: rgba(255,107,107,0.12); color: var(--error); }
+
+  h2.section-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin: 0 0 14px;
+    color: var(--chalk-dim);
+  }
+  .board-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 4px; border-bottom: 1px solid rgba(255,255,255,0.07); gap: 8px;
+  }
+  .board-row:last-child { border-bottom: none; }
+  .board-row .rank { font-family: 'Oswald', sans-serif; color: var(--chalk-dim); width: 20px; flex-shrink: 0; }
+  .board-row .name { flex: 1; overflow-wrap: anywhere; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .board-row .you-tag {
+    font-size: 0.7rem; color: var(--accent); border: 1px solid var(--accent);
+    border-radius: 4px; padding: 1px 5px;
+  }
+  .board-row .streak { color: var(--chalk-dim); font-size: 0.78rem; flex-shrink: 0; }
+  .board-row .points {
+    font-family: 'Oswald', sans-serif; font-weight: 700; color: var(--accent);
+    flex-shrink: 0; width: 34px; text-align: right;
+  }
+  .empty-note { color: var(--chalk-dim); font-size: 0.9rem; text-align: center; padding: 10px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔤 Motus d'Équipe</h1>
+
+  <!-- Pseudo -->
+  <div id="pseudo-section" class="section active">
+    <div class="card">
+      <p class="lead">Entre ton pseudo pour jouer au mot du jour.</p>
+      <label for="pseudo">Pseudo</label>
+      <input type="text" id="pseudo" placeholder="Ex: Ludivine" maxlength="24">
+      <button onclick="setPseudo()">Jouer</button>
+      <p class="error-msg" id="pseudo-error">Entre un pseudo pour continuer.</p>
+    </div>
+  </div>
+
+  <!-- Jeu -->
+  <div id="game-section" class="section">
+    <div class="card">
+      <div class="day-label" id="day-label"></div>
+      <div class="result-banner" id="result-banner" style="display:none;"></div>
+      <div class="grid" id="grid"></div>
+      <div class="keyboard" id="keyboard"></div>
+      <p class="error-msg" id="game-error"></p>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">🏆 Classement général</h2>
+      <div id="general-leaderboard"></div>
+      <p class="empty-note" id="general-leaderboard-empty" style="display:none;">Personne n'a encore de points.</p>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Résultats du jour</h2>
+      <div id="today-results"></div>
+      <p class="empty-note" id="today-results-empty" style="display:none;">Personne n'a encore joué aujourd'hui.</p>
+    </div>
+
+    <span class="footer-link" onclick="changePseudo()">Changer de pseudo</span>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import {
+  getFirestore, doc, setDoc, getDoc, serverTimestamp, increment,
+  collection, query, orderBy, limit, onSnapshot, where
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+// ⚠️ Remplacez par votre configuration Firebase (nouveau projet dédié à ce jeu)
+const firebaseConfig = VOTRE_CONFIG_FIREBASE_ICI;
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Liste de mots de 5 lettres (sans accents). Le mot du jour est choisi
+// automatiquement selon la date, le même pour tout le monde.
+const WORDS = [
+"TABLE","CHIEN","TIGRE","POMME","CARTE","LIVRE","STYLO","CRAIE","GOMME","REGLE",
+"ECOLE","MAIRE","VILLE","ROUTE","PLACE","FORET","NUAGE","PLUIE","VENTE","ORAGE",
+"GIVRE","GLACE","FUMEE","FERME","CHAMP","ROCHE","SABLE","GALET","CORDE","NOEUD",
+"BETON","ACIER","LAINE","COTON","TISSU","NAPPE","TAPIS","ETAGE","SALON","METRO",
+"TRAIN","AVION","PISTE","PANNE","FREIN","SIEGE","CAPOT","PHARE","VITRE","CADRE",
+"TOILE","MUSEE","DANSE","ECRAN","PHOTO","IMAGE","VIDEO","BRUIT","CHANT","GAMME",
+"PIANO","FLUTE","FRERE","SOEUR","ONCLE","TANTE","NEVEU","NIECE","MAMIE","AMOUR",
+"BISOU","ANNEE","MATIN","HEURE","HIVER","FROID","CHAUD","TIEDE","TERRE","FUSEE",
+"PLAGE","VOILE","FLEUR","NEIGE","PORTE","SOURD","VERRE","TASSE","GRAND","PETIT",
+"BELLE","VERTE","ROUGE","JAUNE","BLEUE","BLANC","LOURD","LEGER","LARGE","HAUTE",
+"COURT","RONDE","CARRE","DOUCE","AMERE","SUCRE","SALEE","EPICE","PATES","TARTE",
+"SOUPE","FRUIT","MELON","PRUNE","OLIVE","HERBE","TRONC"
+];
+
+const WORD_LENGTH = 5;
+const MAX_ATTEMPTS = 6;
+const START_DATE = "2026-09-20"; // jour 0 du défi
+
+const AZERTY_ROWS = [
+  ["A","Z","E","R","T","Y","U","I","O","P"],
+  ["Q","S","D","F","G","H","J","K","L","M"],
+  ["ENTREE","W","X","C","V","B","N","EFFACER"]
+];
+
+let currentPseudo = "";
+let todayWord = "";
+let todayStr = "";
+let guesses = [];       // tableau de mots déjà tentés
+let feedbacks = [];     // tableau de feedbacks par tentative (["green","yellow","grey",...])
+let currentGuess = "";
+let gameOver = false;
+let keyStatus = {};     // meilleur statut connu par lettre
+
+function show(sectionId) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.getElementById(sectionId).classList.add("active");
+}
+
+function pseudoDocId(pseudo) {
+  return pseudo.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 40) || "joueur";
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function getLocalDateStr(d = new Date()) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function daysSinceStart() {
+  const start = new Date(START_DATE + "T00:00:00");
+  const now = new Date();
+  const startMid = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const nowMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((nowMid - startMid) / 86400000);
+}
+
+function getTodayWord() {
+  const idx = daysSinceStart();
+  const wrapped = ((idx % WORDS.length) + WORDS.length) % WORDS.length;
+  return WORDS[wrapped];
+}
+
+window.setPseudo = function () {
+  const input = document.getElementById("pseudo");
+  const pseudo = input.value.trim();
+  const errorEl = document.getElementById("pseudo-error");
+  if (!pseudo) { errorEl.style.display = "block"; return; }
+  errorEl.style.display = "none";
+
+  currentPseudo = pseudo;
+  localStorage.setItem("motusPseudo", pseudo);
+
+  show("game-section");
+  initGame();
+  startGeneralLeaderboard();
+  startTodayResults();
+};
+
+window.changePseudo = function () {
+  document.getElementById("pseudo").value = currentPseudo;
+  show("pseudo-section");
+};
+
+async function initGame() {
+  todayWord = getTodayWord();
+  todayStr = getLocalDateStr();
+  document.getElementById("day-label").textContent = `Mot du jour — ${new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long" })}`;
+
+  const resultDoc = await getDoc(doc(db, "motusResults", `${todayStr}_${pseudoDocId(currentPseudo)}`));
+
+  if (resultDoc.exists()) {
+    const d = resultDoc.data();
+    guesses = d.guesses || [];
+    feedbacks = guesses.map(g => computeFeedback(g));
+    gameOver = true;
+    renderGrid();
+    renderKeyboard();
+    showResultBanner(d.solved, d.attempts);
+  } else {
+    guesses = [];
+    feedbacks = [];
+    currentGuess = todayWord[0]; // première lettre donnée
+    gameOver = false;
+    keyStatus = {};
+    renderGrid();
+    renderKeyboard();
+    document.getElementById("result-banner").style.display = "none";
+  }
+}
+
+function computeFeedback(guess) {
+  const result = Array(WORD_LENGTH).fill("grey");
+  const secretArr = todayWord.split("");
+  const guessArr = guess.split("");
+  const pool = {};
+
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (guessArr[i] === secretArr[i]) {
+      result[i] = "green";
+    } else {
+      pool[secretArr[i]] = (pool[secretArr[i]] || 0) + 1;
+    }
+  }
+  for (let i = 0; i < WORD_LENGTH; i++) {
+    if (result[i] === "green") continue;
+    const letter = guessArr[i];
+    if (pool[letter] > 0) {
+      result[i] = "yellow";
+      pool[letter]--;
+    }
+  }
+  return result;
+}
+
+function renderGrid() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  for (let r = 0; r < MAX_ATTEMPTS; r++) {
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const isCurrentRow = r === guesses.length && !gameOver;
+    const word = isCurrentRow ? currentGuess : (guesses[r] || "");
+    const fb = feedbacks[r];
+
+    for (let c = 0; c < WORD_LENGTH; c++) {
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      const letter = word[c] || "";
+      tile.textContent = letter;
+
+      if (fb) {
+        tile.classList.add(fb[c]);
+      } else if (c === 0) {
+        tile.classList.add("given");
+      } else if (letter) {
+        tile.classList.add("filled");
+      }
+      row.appendChild(tile);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function renderKeyboard() {
+  const kb = document.getElementById("keyboard");
+  kb.innerHTML = "";
+
+  AZERTY_ROWS.forEach(rowLetters => {
+    const rowEl = document.createElement("div");
+    rowEl.className = "kb-row";
+    rowLetters.forEach(k => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "key" + (k.length > 1 ? " wide" : "");
+      if (keyStatus[k] === "green") btn.classList.add("green");
+      else if (keyStatus[k] === "yellow") btn.classList.add("yellow");
+      else if (keyStatus[k] === "grey") btn.classList.add("grey");
+      btn.textContent = k === "ENTREE" ? "Entrée" : (k === "EFFACER" ? "⌫" : k);
+      btn.onclick = () => handleKey(k);
+      rowEl.appendChild(btn);
+    });
+    kb.appendChild(rowEl);
+  });
+}
+
+function handleKey(key) {
+  if (gameOver) return;
+  const errorEl = document.getElementById("game-error");
+  errorEl.style.display = "none";
+
+  if (key === "EFFACER") {
+    if (currentGuess.length > 1) currentGuess = currentGuess.slice(0, -1);
+    renderGrid();
+    return;
+  }
+  if (key === "ENTREE") {
+    if (currentGuess.length !== WORD_LENGTH) {
+      errorEl.textContent = "Complète le mot (5 lettres) avant de valider.";
+      errorEl.style.display = "block";
+      return;
+    }
+    submitGuess();
+    return;
+  }
+  if (currentGuess.length < WORD_LENGTH) {
+    currentGuess += key;
+    renderGrid();
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if (document.getElementById("game-section").classList.contains("active") && !gameOver) {
+    const k = e.key.toUpperCase();
+    if (k === "ENTER") handleKey("ENTREE");
+    else if (k === "BACKSPACE") handleKey("EFFACER");
+    else if (/^[A-Z]$/.test(k)) handleKey(k);
+  }
+});
+
+async function submitGuess() {
+  const guess = currentGuess;
+  const fb = computeFeedback(guess);
+
+  guesses.push(guess);
+  feedbacks.push(fb);
+
+  fb.forEach((status, i) => {
+    const letter = guess[i];
+    const rank = { green: 3, yellow: 2, grey: 1 };
+    if (!keyStatus[letter] || rank[status] > rank[keyStatus[letter]]) {
+      keyStatus[letter] = status;
+    }
+  });
+
+  const solved = guess === todayWord;
+  const failed = !solved && guesses.length >= MAX_ATTEMPTS;
+
+  if (solved || failed) {
+    gameOver = true;
+    await finishGame(solved, guesses.length);
+  } else {
+    currentGuess = todayWord[0];
+  }
+
+  renderGrid();
+  renderKeyboard();
+}
+
+async function finishGame(solved, attempts) {
+  const points = solved ? (MAX_ATTEMPTS + 1 - attempts) : 0;
+  showResultBanner(solved, attempts);
+
+  try {
+    await setDoc(doc(db, "motusResults", `${todayStr}_${pseudoDocId(currentPseudo)}`), {
+      pseudo: currentPseudo,
+      date: todayStr,
+      attempts,
+      solved,
+      points,
+      guesses,
+      updatedAt: serverTimestamp()
+    });
+
+    const yesterdayStr = getLocalDateStr(new Date(Date.now() - 86400000));
+    const playerRef = doc(db, "players", pseudoDocId(currentPseudo));
+    const playerSnap = await getDoc(playerRef);
+    const prev = playerSnap.exists() ? playerSnap.data() : { currentStreak: 0, lastPlayedDate: null };
+
+    let newStreak;
+    if (solved && prev.lastPlayedDate === yesterdayStr) newStreak = (prev.currentStreak || 0) + 1;
+    else if (solved) newStreak = 1;
+    else newStreak = 0;
+
+    await setDoc(playerRef, {
+      pseudo: currentPseudo,
+      totalPoints: increment(points),
+      currentStreak: newStreak,
+      lastPlayedDate: todayStr
+    }, { merge: true });
+
+  } catch (error) {
+    document.getElementById("game-error").textContent = `Erreur d'enregistrement : ${error.message}`;
+    document.getElementById("game-error").style.display = "block";
+  }
+}
+
+function showResultBanner(solved, attempts) {
+  const banner = document.getElementById("result-banner");
+  banner.style.display = "block";
+  if (solved) {
+    banner.className = "result-banner win";
+    banner.textContent = `Gagné en ${attempts} essai${attempts > 1 ? "s" : ""} ! 🎉`;
+  } else {
+    banner.className = "result-banner lose";
+    banner.textContent = `Raté ! Le mot était : ${todayWord}`;
+  }
+}
+
+function startGeneralLeaderboard() {
+  const q = query(collection(db, "players"), orderBy("totalPoints", "desc"), limit(100));
+  onSnapshot(q, (snapshot) => {
+    const board = document.getElementById("general-leaderboard");
+    const emptyNote = document.getElementById("general-leaderboard-empty");
+    board.innerHTML = "";
+
+    if (snapshot.empty) { emptyNote.style.display = "block"; return; }
+    emptyNote.style.display = "none";
+
+    let rank = 0;
+    snapshot.forEach((docSnap) => {
+      rank++;
+      const d = docSnap.data();
+      const isYou = d.pseudo === currentPseudo;
+      const row = document.createElement("div");
+      row.className = "board-row";
+      row.innerHTML = `
+        <span class="rank">#${rank}</span>
+        <span class="name">
+          ${escapeHtml(d.pseudo || "?")}
+          ${isYou ? '<span class="you-tag">TOI</span>' : ""}
+        </span>
+        <span class="streak">🔥 ${d.currentStreak || 0}</span>
+        <span class="points">${d.totalPoints || 0}</span>
+      `;
+      board.appendChild(row);
+    });
+  });
+}
+
+function startTodayResults() {
+  const todayForQuery = getLocalDateStr();
+  const q = query(collection(db, "motusResults"), where("date", "==", todayForQuery));
+  onSnapshot(q, (snapshot) => {
+    const list = document.getElementById("today-results");
+    const emptyNote = document.getElementById("today-results-empty");
+    list.innerHTML = "";
+
+    if (snapshot.empty) { emptyNote.style.display = "block"; return; }
+    emptyNote.style.display = "none";
+
+    const rows = snapshot.docs.map(d => d.data()).sort((a, b) => b.points - a.points);
+
+    rows.forEach((d) => {
+      const isYou = d.pseudo === currentPseudo;
+      const row = document.createElement("div");
+      row.className = "board-row";
+      row.innerHTML = `
+        <span class="name">
+          ${escapeHtml(d.pseudo || "?")}
+          ${isYou ? '<span class="you-tag">TOI</span>' : ""}
+        </span>
+        <span class="streak">${d.solved ? `${d.attempts} essai(s)` : "Échec"}</span>
+        <span class="points">${d.points}</span>
+      `;
+      list.appendChild(row);
+    });
+  });
+}
+
+window.onload = function () {
+  const saved = localStorage.getItem("motusPseudo");
+  if (saved) {
+    document.getElementById("pseudo").value = saved;
+  }
+};
+</script>
+</body>
+</html>
