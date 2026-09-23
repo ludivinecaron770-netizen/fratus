@@ -289,7 +289,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getFirestore, doc, setDoc, getDoc, serverTimestamp, increment,
+  getFirestore, doc, setDoc, getDoc, serverTimestamp, increment, writeBatch,
   collection, query, orderBy, limit, onSnapshot, where
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
@@ -326,6 +326,7 @@ let feedbacks = [];
 let currentGuess = "";
 let gameOver = false;
 let keyStatus = {};
+let lastFinishParams = null; // pour permettre un "réessayer" en cas d'échec d'enregistrement
 
 function show(sectionId) {
   document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
@@ -653,22 +654,19 @@ async function saveProgress() {
   }
 }
 
+// Calcule le nouveau streak, puis écrit le résultat final ET le total cumulé
+// EN UNE SEULE OPÉRATION ATOMIQUE (writeBatch) : soit les deux passent, soit
+// aucun des deux n'est appliqué. Le bandeau "Gagné !" ne s'affiche qu'une
+// fois cette opération confirmée — impossible de fermer l'appli "trop tôt"
+// en pensant que les points sont déjà enregistrés alors qu'ils ne le sont pas.
 async function finishGame(solved, attempts) {
+  lastFinishParams = { solved, attempts };
+  const errorEl = document.getElementById("game-error");
+  errorEl.style.display = "none";
+
   const points = solved ? (MAX_ATTEMPTS + 1 - attempts) : 0;
-  showResultBanner(solved, attempts);
 
   try {
-    await setDoc(doc(db, "motusResults", `${todayStr}_${pseudoDocId(currentPseudo)}`), {
-      pseudo: currentPseudo,
-      date: todayStr,
-      attempts,
-      solved,
-      finished: true,
-      points,
-      guesses,
-      updatedAt: serverTimestamp()
-    });
-
     const yesterdayStr = getLocalDateStr(new Date(Date.now() - 86400000));
     const playerRef = doc(db, "players", pseudoDocId(currentPseudo));
     const playerSnap = await getDoc(playerRef);
@@ -679,18 +677,39 @@ async function finishGame(solved, attempts) {
     else if (solved) newStreak = 1;
     else newStreak = 0;
 
-    await setDoc(playerRef, {
+    const batch = writeBatch(db);
+    batch.set(doc(db, "motusResults", `${todayStr}_${pseudoDocId(currentPseudo)}`), {
+      pseudo: currentPseudo,
+      date: todayStr,
+      attempts,
+      solved,
+      finished: true,
+      points,
+      guesses,
+      updatedAt: serverTimestamp()
+    });
+    batch.set(playerRef, {
       pseudo: currentPseudo,
       totalPoints: increment(points),
       currentStreak: newStreak,
       lastPlayedDate: todayStr
     }, { merge: true });
 
+    await batch.commit();
+
+    showResultBanner(solved, attempts);
+
   } catch (error) {
-    document.getElementById("game-error").textContent = `Erreur d'enregistrement : ${error.message}`;
-    document.getElementById("game-error").style.display = "block";
+    errorEl.innerHTML = `Erreur d'enregistrement, tes points n'ont pas été sauvegardés. <button type="button" onclick="retryFinish()" style="width:auto;display:inline;margin:0 0 0 6px;padding:4px 10px;font-size:0.85rem;">Réessayer</button>`;
+    errorEl.style.display = "block";
   }
 }
+
+window.retryFinish = function () {
+  if (lastFinishParams) {
+    finishGame(lastFinishParams.solved, lastFinishParams.attempts);
+  }
+};
 
 function showResultBanner(solved, attempts) {
   const banner = document.getElementById("result-banner");
