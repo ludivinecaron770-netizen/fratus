@@ -271,7 +271,7 @@
     </div>
 
     <div class="card">
-      <h2 class="section-title">🏆 Classement général</h2>
+      <h2 class="section-title">🏆 Classement du mois</h2>
       <div id="general-leaderboard"></div>
       <p class="empty-note" id="general-leaderboard-empty" style="display:none;">Personne n'a encore de points.</p>
     </div>
@@ -282,6 +282,12 @@
       <p class="empty-note" id="today-results-empty" style="display:none;">Personne n'a encore joué aujourd'hui.</p>
     </div>
 
+    <div class="card">
+      <h2 class="section-title">📅 Classement du mois précédent</h2>
+      <div id="lastmonth-leaderboard"></div>
+      <p class="empty-note" id="lastmonth-leaderboard-empty" style="display:none;">Aucune donnée pour le mois précédent.</p>
+    </div>
+
     <span class="footer-link" onclick="changePseudo()">Changer de pseudo</span>
   </div>
 </div>
@@ -289,7 +295,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getFirestore, doc, setDoc, getDoc, serverTimestamp, increment, writeBatch,
+  getFirestore, doc, setDoc, getDoc, getDocs, serverTimestamp, increment, writeBatch,
   collection, query, orderBy, limit, onSnapshot, where
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
@@ -348,6 +354,14 @@ function getLocalDateStr(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
+// Identifiant du mois en cours, ex: "2026-10". Sert à isoler les documents
+// motusResults par mois et à détecter quand un nouveau mois commence.
+function getMonthId(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
 function daysSinceStart() {
   const start = new Date(START_DATE + "T00:00:00");
   const now = new Date();
@@ -392,6 +406,50 @@ async function loadAcceptedWords() {
   }
 }
 
+// ============================================================
+// RESET MENSUEL DU CLASSEMENT
+//
+// On considère que le mois "vient de commencer" si aucun document
+// motusResults n'existe encore pour ce mois. Dans ce cas, avant que
+// quiconque n'ait joué, on sauvegarde le total de chaque joueur dans
+// lastMonthTotalPoints puis on remet totalPoints à 0. currentStreak
+// et lastPlayedDate ne sont pas touchés : ils suivent la régularité
+// de jeu au fil des jours, pas les points, donc un reset mensuel des
+// points n'a pas de raison de casser une série en cours.
+// ============================================================
+
+async function hasAnyGameThisMonth() {
+  const q = query(
+    collection(db, "motusResults"),
+    where("month", "==", getMonthId()),
+    limit(1)
+  );
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+}
+
+async function resetAllPlayersIfNeeded() {
+  try {
+    const hasGame = await hasAnyGameThisMonth();
+    if (hasGame) return; // le mois a déjà commencé à être joué, rien à faire
+
+    const snapshot = await getDocs(collection(db, "players"));
+    if (snapshot.empty) return;
+
+    const batch = writeBatch(db);
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      batch.update(docSnap.ref, {
+        lastMonthTotalPoints: data.totalPoints || 0,
+        totalPoints: 0
+      });
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error("Erreur reset mensuel :", error);
+  }
+}
+
 window.setPseudo = function () {
   const input = document.getElementById("pseudo");
   const pseudo = input.value.trim();
@@ -404,7 +462,10 @@ window.setPseudo = function () {
 
   show("game-section");
   initGame();
-  startGeneralLeaderboard();
+  resetAllPlayersIfNeeded().finally(() => {
+    startGeneralLeaderboard();
+    startLastMonthLeaderboard();
+  });
   startTodayResults();
 };
 
@@ -641,6 +702,7 @@ async function saveProgress() {
     await setDoc(doc(db, "motusResults", `${todayStr}_${pseudoDocId(currentPseudo)}`), {
       pseudo: currentPseudo,
       date: todayStr,
+      month: getMonthId(),
       attempts: guesses.length,
       solved: false,
       finished: false,
@@ -681,6 +743,7 @@ async function finishGame(solved, attempts) {
     batch.set(doc(db, "motusResults", `${todayStr}_${pseudoDocId(currentPseudo)}`), {
       pseudo: currentPseudo,
       date: todayStr,
+      month: getMonthId(),
       attempts,
       solved,
       finished: true,
@@ -748,6 +811,38 @@ function startGeneralLeaderboard() {
         </span>
         <span class="streak">🔥 ${d.currentStreak || 0}</span>
         <span class="points">${d.totalPoints || 0}</span>
+      `;
+      board.appendChild(row);
+    });
+  });
+}
+
+// Classement basé sur lastMonthTotalPoints, alimenté une fois par mois
+// par resetAllPlayersIfNeeded() au moment où le mois précédent bascule.
+function startLastMonthLeaderboard() {
+  const q = query(collection(db, "players"), orderBy("lastMonthTotalPoints", "desc"), limit(100));
+  onSnapshot(q, (snapshot) => {
+    const board = document.getElementById("lastmonth-leaderboard");
+    const emptyNote = document.getElementById("lastmonth-leaderboard-empty");
+    board.innerHTML = "";
+
+    if (snapshot.empty) { emptyNote.style.display = "block"; return; }
+    emptyNote.style.display = "none";
+
+    let rank = 0;
+    snapshot.forEach((docSnap) => {
+      rank++;
+      const d = docSnap.data();
+      const isYou = d.pseudo === currentPseudo;
+      const row = document.createElement("div");
+      row.className = "board-row";
+      row.innerHTML = `
+        <span class="rank">#${rank}</span>
+        <span class="name">
+          ${escapeHtml(d.pseudo || "?")}
+          ${isYou ? '<span class="you-tag">TOI</span>' : ""}
+        </span>
+        <span class="points">${d.lastMonthTotalPoints || 0}</span>
       `;
       board.appendChild(row);
     });
